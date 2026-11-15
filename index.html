@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>貨幣戰爭・入畫奇航 成就陣容產生器</title>
+<style>
+  :root{
+    --bg:#15122b; --panel:#211c44; --panel2:#2b2558; --line:#3d357a; --text:#ecebff; --dim:#a29fd0;
+    --accent:#b48cff; --ok:#5fd6a0; --bad:#ff7d8c; --warn:#ffc861;
+    --c1:#8d93a8; --c2:#58c08a; --c3:#5aa2f0; --c4:#b678f2; --c5:#f0b545;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Microsoft JhengHei","PingFang TC",system-ui,sans-serif}
+  header{padding:18px 20px 6px}
+  h1{margin:0;font-size:22px}
+  header p{margin:4px 0 0;color:var(--dim);font-size:13px}
+  main{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:16px;padding:14px 20px 40px;align-items:start}
+  @media(max-width:860px){main{grid-template-columns:1fr;padding:12px 16px 40px}}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px}
+  h2{margin:0 0 10px;font-size:16px;color:var(--accent)}
+  h2 small{color:var(--dim);font-weight:normal;font-size:12px;margin-left:6px}
+  .ach{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer}
+  .ach:hover{background:var(--panel2)}
+  .ach input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);flex:none}
+  .ach .nm{flex:1}
+  .ach .tag{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+  select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 5px;font:inherit}
+  input[type=number]{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:5px;padding:3px 5px;font:inherit}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0}
+  .row label{color:var(--text)}
+  .hint{color:var(--dim);font-size:12px;margin:6px 0 0}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:inherit;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .banner{padding:10px 12px;border-radius:8px;margin-bottom:12px;font-weight:bold}
+  .banner.ok{background:#17382f;border:1px solid var(--ok);color:var(--ok)}
+  .banner.bad{background:#40202a;border:1px solid var(--bad);color:var(--bad)}
+  .banner.idle{background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-weight:normal}
+  #team h3{margin:10px 0 6px;font-size:14px;color:var(--dim);font-weight:normal}
+  .team{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-left:5px solid var(--c1);border-radius:8px;padding:8px 10px}
+  .card{display:flex;gap:9px;align-items:flex-start}
+  .card img{width:46px;height:46px;border-radius:8px;object-fit:cover;background:var(--bg);flex:none}
+  .card .body{flex:1;min-width:0}
+  .card .top{display:flex;justify-content:space-between;gap:6px;font-weight:bold}
+  .card .meta{font-size:12px;color:var(--dim)}
+  .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+  .chip{font-size:12px;border-radius:4px;padding:0 6px;background:#3a3370;color:var(--text)}
+  .chip.hit{background:#5a3fa8}
+  .chip.emb{background:#6b4a12;color:var(--warn);border:1px dashed var(--warn)}
+  .k1{border-left-color:var(--c1)}.k2{border-left-color:var(--c2)}.k3{border-left-color:var(--c3)}.k4{border-left-color:var(--c4)}.k5{border-left-color:var(--c5)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:normal;font-size:12px}
+  td.num{font-variant-numeric:tabular-nums}
+  .ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}.dim{color:var(--dim)}
+  .roster{display:flex;flex-wrap:wrap;gap:5px}
+  .rc{font-size:13px;padding:2px 8px;border-radius:5px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;user-select:none}
+  .rc.must{background:#1d4a3b;border-color:var(--ok);color:var(--ok)}
+  .rc.ban{background:#3a1f28;border-color:var(--bad);color:var(--bad);text-decoration:line-through}
+  .scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<header>
+  <button id="btnLang" style="float:right"></button>
+  <h1>貨幣戰爭・入畫奇航 — 成就陣容產生器</h1>
+  <p>勾選想一次達成的「大師之路」成就，自動組出陣容，並算出還缺幾層需要用星徽補。</p>
+</header>
+<main>
+  <div>
+    <section>
+      <h2>成就</h2>
+      <div id="achList"></div>
+      <div class="row" style="margin-top:6px">
+        <button id="btnNone">全部取消</button>
+      </div>
+    </section>
+    <section>
+      <h2>設定</h2>
+      <div class="row"><span>前台格</span><span>4（固定）</span></div>
+      <div class="row"><label for="sB">後台格</label><input type="number" id="sB" min="0" max="20" value="9"></div>
+      <div class="row"><label for="sCost">費用偏好</label><select id="sCost"><option value="high">優先高費角色</option><option value="low">優先低費角色</option></select></div>
+      <p class="hint">每名角色最多帶 3 個星徽，星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
+    </section>
+  </div>
+  <div>
+    <section>
+      <h2>陣容</h2>
+      <div id="banner" class="banner idle">請先勾選成就。</div>
+      <div id="team"></div>
+    </section>
+    <section>
+      <h2>羈絆統計</h2>
+      <div class="scroll"><table id="bondTable"></table></div>
+    </section>
+    <section>
+      <h2>指定角色 <small>點一下＝必帶，再點＝排除，再點＝還原</small></h2>
+      <div id="roster" class="roster"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+// ---------- 資料（來自資料夾內的三個 CSV） ----------
+const CSV_CHARS = `4/5/7,星神★阿哈,前台,歡愉,幻樂之主,
+5,雪衣,前台,仙舟艦隊,擊破,
+5,帕姆王,後台,開拓銀軌,,
+5,克拉拉,前後台,星間旅人,反擊,機心巧匠
+5,不死途,後台,幻月遊戲,追擊,巡海遊俠
+5,丹恆•飲月,前台,開拓銀軌,雲上五驍,雙龍吟
+5,丹恆•騰荒,後台,雙龍吟,,
+5,阿格萊雅,前台,奇獸花園,連擊,
+5,卡芙卡,前台,星核獵手,持續傷害,
+5,翡翠,後台,千星商會,群攻,黑市主理人
+5,白厄,前後台,黃金大飯店,盜火行者,
+4,寒鴉,後台,仙舟艦隊,連擊,
+4,砂金•戲浪,前台,千星商會,歡愉,
+4,希露瓦,前台,少女樂隊,持續傷害,
+4,姬子•啟行,前台,開拓銀軌,能量,
+4,千冶•刃,前後台,幻月遊戲,星核獵手,群攻
+4,昔漣,前台,黃金大飯店,召喚,
+4,藿藿,後台,小小巨人,能量,治療
+4,風堇,前後台,奇獸花園,召喚,治療
+4,砂金,前後台,星間旅人,追擊,守護
+4,刃,前後台,雲上五驍,反擊,
+4,黃泉,前台,夢境交織,群攻,
+4,緹寶,前後台,小小巨人,追擊,
+3,銀狼LV.999,前台,幻月遊戲,星核獵手,歡愉
+3,開拓者•歡愉,前後台,開拓銀軌,星核獵手,能量
+3,爻光,後台,千星商會,歡愉,
+3,大麗花,前後台,夢境交織,擊破,
+3,亂破,後台,少女樂隊,擊破,
+3,鏡流,前後台,雲上五驍,連擊,
+3,椒丘,前台,仙舟艦隊,持續傷害,
+3,飛霄,前台,仙舟艦隊,追擊,
+3,賽飛兒,後台,奇獸花園,群攻,
+3,羅剎,前後台,星間旅人,治療,
+3,遐蝶,前後台,黃金大飯店,召喚,
+3,符玄,後台,小小巨人,反擊,守護
+2,知更鳥•晴歌,前後台,千星商會,召喚,能量
+2,白露,後台,雲上五驍,連擊,治療
+2,緋英,前後台,幻月遊戲,能量,
+2,萬敵,前後台,奇獸花園,黃金大飯店,反擊
+2,知更鳥,前台,少女樂隊,追擊,
+2,星期日,前後台,幻月遊戲,開拓銀軌,連擊
+2,雲璃,前後台,仙舟艦隊,反擊,
+2,娜塔莎,後台,星間旅人,持續傷害,治療
+2,大黑塔,前台,星間旅人,群攻,
+2,花火,前台,小小巨人,夢境交織,歡愉
+2,流螢,前台,星核獵手,擊破,
+2,海瑟音,前後台,奇獸花園,持續傷害,
+1,桂乃芬,前後台,仙舟艦隊,持續傷害,
+1,真珠,後台,幻月遊戲,千星商會,守護
+1,三月七•巡獵,後台,開拓銀軌,追擊,
+1,火花,前後台,幻月遊戲,少女樂隊,歡愉
+1,靈砂,前後台,仙舟艦隊,群攻,治療
+1,那刻夏,前台,奇獸花園,連擊,
+1,瓦爾特,前後台,開拓銀軌,群攻,
+1,波提歐,前台,星間旅人,擊破,
+1,托帕&帳帳,前後台,千星商會,追擊,
+1,刻律德菈,後台,小小巨人,連擊,
+1,景元,前後台,雲上五驍,召喚,
+1,忘歸人,前後台,星間旅人,擊破,
+1,長夜月,前後台,奇獸花園,夢境交織,召喚
+1,黑天鵝,後台,夢境交織,持續傷害,`;
+
+const CSV_BONDS = `幻月遊戲,陣營,3/5/7/9
+奇獸花園,陣營,3/5/7/10
+仙舟艦隊,陣營,2/4/6/9
+開拓銀軌,陣營,2/4/6/8/10
+千星商會,陣營,1/2/3/4/5/6
+雲上五驍,陣營,2/3/4/5
+星核獵手,陣營,2/3/5/7
+黃金大飯店,陣營,2/3/4
+夢境交織,陣營,2/3/4/5
+星間旅人,陣營,1/2/3/4/5/6/7/8
+小小巨人,陣營,2/3/4/5/6
+少女樂隊,陣營,1/4
+連擊,流派,2/4/6/8
+追擊,流派,3/5/7/10
+持續傷害,流派,3/5/7/9
+群攻,流派,2/4/6/8
+擊破,流派,2/4/6/8
+歡愉,流派,3/5/6/8
+反擊,流派,2/4/6
+召喚,流派,2/4/6/8
+能量,流派,2/4/6
+治療,流派,2/4/6
+守護,流派,2/3
+幻樂之主,專屬,
+機心巧匠,專屬,
+巡海遊俠,專屬,
+雙龍吟,專屬,
+黑市主理人,專屬,
+盜火行者,專屬,`;
+
+const CSV_ACH = `1,仙舟艦隊,9
+2,奇獸花園,10
+3,幻月遊戲,10
+4,開拓銀軌,10
+5,星核獵手,7
+6,千星商會,6三星
+7,追擊,10
+8,持續傷害,9
+9,群攻,8
+10,擊破,8
+11,召喚,8
+12,能量,6
+13,連擊,8
+14,歡愉,8`;
+
+const CHARS = CSV_CHARS.split('\n').map((l, i) => {
+  const p = l.split(',');
+  return { id: i, costText: p[0], cost: parseInt(p[0], 10), name: p[1], pos: p[2], bonds: p.slice(3).filter(Boolean) };
+});
+const BONDS = {};
+CSV_BONDS.split('\n').forEach(l => {
+  const [name, type, th] = l.split(',');
+  BONDS[name] = { name, type, th: th ? th.split('/').map(Number) : [], members: CHARS.filter(c => c.bonds.includes(name)).map(c => c.id) };
+});
+const ACHS = CSV_ACH.split('\n').map(l => {
+  const [no, bond, need] = l.split(',');
+  return { no: +no, bond, need: parseInt(need, 10), star3: need.includes('三星'), checked: false };
+});
+const pick = {}; // id -> 'must' | 'ban'
+
+// ---------- 求解 ----------
+function solve() {
+  const sel = ACHS.filter(a => a.checked);
+  const F = 4, K = 3, B = clampInt('sB', 0, 20, 9), N = F + B;
+  if (!sel.length) return null;
+  const dir = document.getElementById('sCost').value === 'high' ? -1 : 1; // 同樣能達成時，偏好低費或高費
+
+  const need = {};
+  sel.forEach(a => need[a.bond] = a.need);
+  const selBonds = Object.keys(need);
+
+  const avail = CHARS.filter(c => pick[c.id] !== 'ban');
+  const must = avail.filter(c => pick[c.id] === 'must');
+  const weight = c => c.bonds.filter(b => b in need).length;
+  const cand = avail.filter(c => pick[c.id] !== 'must' && weight(c) > 0)
+    .sort((a, b) => weight(b) - weight(a) || dir * (a.cost - b.cost));
+  const w = cand.map(weight);
+  const pre = [0]; w.forEach((x, i) => pre.push(pre[i] + x));
+
+  const cnt = {}; selBonds.forEach(b => cnt[b] = 0);
+  let fo = 0, bo = 0, cov = 0, cost = 0;
+  const chosen = [];
+  const add = (c, s) => {
+    c.bonds.forEach(b => { if (b in need) { if (s > 0) { if (cnt[b] < need[b]) cov++; cnt[b]++; } else { cnt[b]--; if (cnt[b] < need[b]) cov--; } } });
+    if (c.pos === '前台') fo += s; if (c.pos === '後台') bo += s;
+    cost += s * c.cost;
+    if (s > 0) chosen.push(c); else chosen.pop();
+  };
+  const fits = c => !(c.pos === '前台' && fo >= F) && !(c.pos === '後台' && bo >= B);
+
+  must.slice(0, N).forEach(c => add(c, 1));
+  let best = { cov: -1, cost: 0, team: [] }, nodes = 0;
+  (function dfs(i) {
+    if (++nodes > 3e6) return;
+    const left = N - chosen.length;
+    if (cov > best.cov || (cov === best.cov && dir * cost < dir * best.cost)) best = { cov, cost, team: chosen.slice() };
+    if (left <= 0 || i >= cand.length) return;
+    const ub = cov + pre[Math.min(cand.length, i + left)] - pre[i];
+    if (ub <= best.cov) return;
+    const c = cand[i];
+    if (fits(c)) { add(c, 1); dfs(i + 1); add(c, -1); }
+    dfs(i + 1);
+  })(0);
+
+  // 補滿人數：挑便宜的角色當星徽的載體
+  const team = best.team.slice();
+  let tf = team.filter(c => c.pos === '前台').length, tb = team.filter(c => c.pos === '後台').length;
+  const inTeam = new Set(team.map(c => c.id));
+  avail.filter(c => !inTeam.has(c.id)).sort((a, b) => dir * (a.cost - b.cost)).forEach(c => {
+    if (team.length >= N) return;
+    if (c.pos === '前台') { if (tf >= F) return; tf++; }
+    if (c.pos === '後台') { if (tb >= B) return; tb++; }
+    team.push(c);
+  });
+
+  // 缺口與星徽分配（最大流）
+  const members = {}, deficit = {};
+  selBonds.forEach(b => {
+    members[b] = team.filter(c => c.bonds.includes(b)).length;
+    deficit[b] = Math.max(0, need[b] - members[b]);
+  });
+  const embBonds = selBonds.filter(b => deficit[b] > 0 && !sel.find(a => a.bond === b).star3);
+  const emb = assignEmblems(team, embBonds, deficit, K);
+
+  const rows = sel.map(a => {
+    const got = members[a.bond] + (emb.count[a.bond] || 0);
+    return { a, members: members[a.bond], emblems: emb.count[a.bond] || 0, got, ok: got >= a.need };
+  });
+  return { team, rows, emb, N, F, B, truncated: nodes > 3e6 };
+}
+
+function assignEmblems(team, bonds, deficit, K) {
+  // 節點：0=S, 1..nb=羈絆, nb+1..nb+nc=角色, 最後=T
+  const nb = bonds.length, nc = team.length, T = nb + nc + 1, n = T + 1;
+  const cap = Array.from({ length: n }, () => new Array(n).fill(0));
+  bonds.forEach((b, i) => {
+    cap[0][i + 1] = deficit[b];
+    team.forEach((c, j) => { if (!c.bonds.includes(b)) cap[i + 1][nb + 1 + j] = 1; });
+  });
+  team.forEach((c, j) => cap[nb + 1 + j][T] = K);
+  for (;;) {
+    const prev = new Array(n).fill(-1); prev[0] = 0;
+    const q = [0];
+    while (q.length && prev[T] < 0) {
+      const u = q.shift();
+      for (let v = 0; v < n; v++) if (prev[v] < 0 && cap[u][v] > 0) { prev[v] = u; q.push(v); }
+    }
+    if (prev[T] < 0) break;
+    for (let v = T; v !== 0; v = prev[v]) { cap[prev[v]][v]--; cap[v][prev[v]]++; }
+  }
+  const byChar = {}, count = {};
+  bonds.forEach((b, i) => team.forEach((c, j) => {
+    if (!c.bonds.includes(b) && cap[i + 1][nb + 1 + j] === 0) {
+      (byChar[c.id] = byChar[c.id] || []).push(b);
+      count[b] = (count[b] || 0) + 1;
+    }
+  }));
+  return { byChar, count, total: Object.values(count).reduce((s, x) => s + x, 0) };
+}
+
+function clampInt(id, lo, hi, def) {
+  const v = parseInt(document.getElementById(id).value, 10);
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def;
+}
+
+// ---------- 語言：資料與介面以繁體撰寫，簡體時逐字轉換 ----------
+const T2S = {};
+{ const p = '並并亂乱來来俠侠個个側侧傷伤兒儿內内剎刹動动員员啟启喚唤園园場场夢梦寶宝專专層层屬属師师帳账帶带幣币幾几後后恆恒態态戰战戲戏擊击敵敌數数會会樂乐機机歐欧歡欢歸归滿满漣涟為为無无營营爭争爾尔狀状獵猎獸兽環环產产畫画當当療疗盜盗種种節节級级組组絆绊結结統统緋绯緹缇總总織织續续羅罗羈羁與与艦舰萊莱萬万螢萤補补裝装複复計计設设話话該该請请護护讓让貨货費费資资賽赛軌轨載载這这連连進进遊游過过達达選选還还陣阵隊队雙双雲云靈灵順顺額额風风飛飞飯饭飲饮騰腾驍骁體体鳥鸟鴉鸦鵝鹅麗丽黃黄點点龍龙開开間间銀银鏡镜長长佔占夾夹';
+  for (let i = 0; i < p.length; i += 2) T2S[p[i]] = p[i + 1]; }
+let lang = 'sc';
+try { lang = localStorage.getItem('cw-lang') || 'sc'; } catch (e) {}
+const tr = s => lang === 'sc' ? s.replace(/[一-鿿]/g, ch => T2S[ch] || ch) : s;
+const PAGE_TITLE = document.title;
+function applyLang() {
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode());) {
+    const tag = n.parentNode.nodeName;
+    if (tag === 'SCRIPT' || tag === 'STYLE') continue;
+    if (n.__t === undefined) n.__t = n.nodeValue;
+    n.nodeValue = tr(n.__t);
+  }
+  document.title = tr(PAGE_TITLE);
+  document.documentElement.lang = lang === 'sc' ? 'zh-Hans' : 'zh-Hant';
+  document.getElementById('btnLang').textContent = lang === 'sc' ? '繁體' : '简体';
+}
+
+// ---------- 畫面 ----------
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+function renderAchs() {
+  const box = $('achList'); box.textContent = '';
+  ACHS.forEach(a => {
+    const row = el('label', 'ach');
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = a.checked;
+    cb.onchange = () => { a.checked = cb.checked; render(); };
+    row.append(cb, el('span', 'nm', a.star3 ? `【${a.need}三星】${a.bond}` : `${a.need} ${a.bond}`));
+    row.append(el('span', 'tag', `成員 ${BONDS[a.bond].members.length}`));
+    box.append(row);
+  });
+}
+
+function renderRoster() {
+  const box = $('roster'); box.textContent = '';
+  CHARS.slice().sort((a, b) => a.cost - b.cost).forEach(c => {
+    const chip = el('span', 'rc ' + (pick[c.id] || ''), `${c.cost}｜${c.name}`);
+    chip.title = tr(c.bonds.join('、') + '（' + c.pos + '）');
+    chip.onclick = () => {
+      pick[c.id] = pick[c.id] === 'must' ? 'ban' : pick[c.id] === 'ban' ? undefined : 'must';
+      renderRoster(); render();
+    };
+    box.append(chip);
+  });
+}
+
+function render() { renderResult(); applyLang(); }
+function renderResult() {
+  const r = solve();
+  const banner = $('banner'), teamBox = $('team'), table = $('bondTable');
+  teamBox.textContent = ''; table.textContent = '';
+  if (!r) { banner.className = 'banner idle'; banner.textContent = '請先勾選成就。'; return; }
+
+  const allOk = r.rows.every(x => x.ok);
+  const totalCost = r.team.reduce((s, c) => s + c.cost, 0);
+  banner.className = 'banner ' + (allOk ? 'ok' : 'bad');
+  banner.textContent = allOk
+    ? `可以同時達成 ${r.rows.length} 個成就：${r.team.length} 人，需要 ${r.emb.total} 個星徽，總費用 ${totalCost}。`
+    : `這個人數與星徽上限下無法全部達成（未達成：${r.rows.filter(x => !x.ok).map(x => x.a.bond).join('、')}）。下面是最接近的陣容。`;
+  if (r.truncated) banner.textContent += '（組合過多，結果為近似解）';
+
+  const selBonds = new Set(r.rows.map(x => x.a.bond));
+  // 分配站位：只能前台的先佔前台，前後台皆可的由高費開始補滿前台，其餘放後台
+  const byCost = (a, b) => b.cost - a.cost;
+  const front = r.team.filter(c => c.pos === '前台').sort(byCost), back = r.team.filter(c => c.pos === '後台').sort(byCost);
+  r.team.filter(c => c.pos === '前後台').sort(byCost).forEach(c => (front.length < r.F ? front : back).push(c));
+  const grids = [[front, '前台', r.F], [back, '後台', r.B]].map(([list, label, slots]) => {
+    teamBox.append(el('h3', '', label + ' ' + list.length + ' / ' + slots));
+    const g = el('div', 'team'); teamBox.append(g);
+    return [list, g];
+  });
+  grids.forEach(([list, grid]) => list.forEach(c => {
+    const card = el('div', 'card k' + c.cost);
+    const top = el('div', 'top'); top.append(el('span', '', c.name), el('span', 'dim', c.costText + ' 費'));
+    const img = el('img'); img.src = 'img/c' + String(c.id).padStart(2, '0') + '.png'; img.alt = ''; img.loading = 'lazy';
+    img.onerror = () => img.remove();
+    const body = el('div', 'body');
+    body.append(top, el('div', 'meta', c.pos));
+    const chips = el('div', 'chips');
+    c.bonds.forEach(b => chips.append(el('span', 'chip' + (selBonds.has(b) ? ' hit' : ''), b)));
+    (r.emb.byChar[c.id] || []).forEach(b => chips.append(el('span', 'chip emb', '＋' + b)));
+    body.append(chips);
+    card.append(img, body);
+    grid.append(card);
+  }));
+
+  // 羈絆統計
+  const head = el('tr');
+  ['羈絆', '成員', '星徽', '合計', '狀態'].forEach(h => head.append(el('th', '', h)));
+  table.append(head);
+  r.rows.forEach(x => {
+    const tr = el('tr');
+    tr.append(el('td', '', x.a.bond), el('td', 'num', x.members), el('td', 'num warn', x.emblems || ''),
+      el('td', 'num', `${x.got} / ${x.a.need}`),
+      el('td', x.ok ? 'ok' : 'bad', x.ok ? (x.a.star3 ? '達成（6 名成員都要升到三星）' : '達成') : `差 ${x.a.need - x.got}`));
+    table.append(tr);
+  });
+  Object.values(BONDS).filter(b => !selBonds.has(b.name) && b.th.length).forEach(b => {
+    const n = r.team.filter(c => c.bonds.includes(b.name)).length;
+    const lv = b.th.filter(t => t <= n).pop();
+    if (!lv) return;
+    const tr = el('tr');
+    tr.append(el('td', 'dim', b.name), el('td', 'num dim', n), el('td'), el('td', 'num dim', `${n}（${b.th.join('/')}）`), el('td', 'dim', `順帶啟動 ${lv}`));
+    table.append(tr);
+  });
+}
+
+$('btnLang').onclick = () => { lang = lang === 'sc' ? 'tc' : 'sc'; try { localStorage.setItem('cw-lang', lang); } catch (e) {} renderRoster(); render(); };
+$('btnNone').onclick = () => { ACHS.forEach(a => a.checked = false); renderAchs(); render(); };
+['sB', 'sCost'].forEach(id => $(id).addEventListener('input', render));
+renderAchs(); renderRoster(); render();
+</script>
+</body>
+</html>
