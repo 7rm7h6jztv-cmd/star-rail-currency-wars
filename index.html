@@ -43,6 +43,7 @@
   .card img{width:46px;height:46px;border-radius:8px;object-fit:cover;background:var(--bg);flex:none}
   .card .body{flex:1;min-width:0}
   .card .top{display:flex;justify-content:space-between;gap:6px;font-weight:bold}
+  .card .top .dim{white-space:nowrap;font-weight:normal}
   .card .meta{font-size:12px;color:var(--dim)}
   .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
   .chip{font-size:12px;border-radius:4px;padding:0 6px;background:#3a3370;color:var(--text)}
@@ -59,6 +60,14 @@
   .rc.must{background:#1d4a3b;border-color:var(--ok);color:var(--ok)}
   .rc.ban{background:#3a1f28;border-color:var(--bad);color:var(--bad);text-decoration:line-through}
   .scroll{overflow-x:auto}
+  @media(max-width:520px){
+    header{padding:14px 16px 4px} h1{font-size:18px}
+    section{padding:12px}
+    .team{grid-template-columns:repeat(auto-fill,minmax(145px,1fr))}
+    .card{padding:7px 8px;gap:7px} .card img{width:38px;height:38px}
+    .ach{padding:9px 8px} .rc{padding:5px 9px}
+    th,td{padding:5px 6px} th,td{white-space:nowrap}
+  }
 </style>
 </head>
 <body>
@@ -79,7 +88,7 @@
     <section>
       <h2>設定</h2>
       <div class="row"><span>前台格</span><span>4（固定）</span></div>
-      <div class="row"><label for="sB">後台格</label><input type="number" id="sB" min="0" max="20" value="9"></div>
+      <div class="row"><label for="sB">後台格（最多 9）</label><input type="number" id="sB" min="0" max="9" value="9"></div>
       <div class="row"><label for="sCost">費用偏好</label><select id="sCost"><option value="high">優先高費角色</option><option value="low">優先低費角色</option></select></div>
       <p class="hint">每名角色最多帶 3 個星徽，星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
     </section>
@@ -224,11 +233,12 @@ const ACHS = CSV_ACH.split('\n').map(l => {
   return { no: +no, bond, need: parseInt(need, 10), star3: need.includes('三星'), checked: false };
 });
 const pick = {}; // id -> 'must' | 'ban'
+pick[CHARS.find(c => c.name === '帕姆王').id] = 'ban'; // 預設排除，可在「指定角色」點回來
 
 // ---------- 求解 ----------
 function solve() {
   const sel = ACHS.filter(a => a.checked);
-  const F = 4, K = 3, B = clampInt('sB', 0, 20, 9), N = F + B;
+  const F = 4, K = 3, B = clampInt('sB', 0, 9, 9), N = F + B;
   if (!sel.length) return null;
   const dir = document.getElementById('sCost').value === 'high' ? -1 : 1; // 同樣能達成時，偏好低費或高費
 
@@ -332,7 +342,7 @@ function clampInt(id, lo, hi, def) {
 
 // ---------- 語言：資料與介面以繁體撰寫，簡體時逐字轉換 ----------
 const T2S = {};
-{ const p = '並并亂乱來来俠侠個个側侧傷伤兒儿內内剎刹動动員员啟启喚唤園园場场夢梦寶宝專专層层屬属師师帳账帶带幣币幾几後后恆恒態态戰战戲戏擊击敵敌數数會会樂乐機机歐欧歡欢歸归滿满漣涟為为無无營营爭争爾尔狀状獵猎獸兽環环產产畫画當当療疗盜盗種种節节級级組组絆绊結结統统緋绯緹缇總总織织續续羅罗羈羁與与艦舰萊莱萬万螢萤補补裝装複复計计設设話话該该請请護护讓让貨货費费資资賽赛軌轨載载這这連连進进遊游過过達达選选還还陣阵隊队雙双雲云靈灵順顺額额風风飛飞飯饭飲饮騰腾驍骁體体鳥鸟鴉鸦鵝鹅麗丽黃黄點点龍龙開开間间銀银鏡镜長长佔占夾夹';
+{ const p = '並并亂乱來来俠侠個个側侧傷伤兒儿內内剎刹動动員员啟启喚唤園园場场夢梦寶宝專专層层屬属師师帳账帶带幣币幾几後后恆恒態态戰战戲戏擊击敵敌數数會会樂乐機机歐欧歡欢歸归滿满漣涟為为無无營营爭争爾尔狀状獵猎獸兽環环產产畫画當当療疗盜盗種种節节級级組组絆绊結结統统緋绯緹缇總总織织續续羅罗羈羁與与艦舰萊莱萬万螢萤補补裝装複复計计設设話话該该請请護护讓让貨货費费資资賽赛軌轨載载這这連连進进遊游過过達达選选還还陣阵隊队雙双雲云靈灵順顺額额風风飛飞飯饭飲饮騰腾驍骁體体鳥鸟鴉鸦鵝鹅麗丽黃黄點点龍龙開开間间銀银鏡镜長长佔占夾夹優优時时';
   for (let i = 0; i < p.length; i += 2) T2S[p[i]] = p[i + 1]; }
 let lang = 'sc';
 try { lang = localStorage.getItem('cw-lang') || 'sc'; } catch (e) {}
@@ -342,7 +352,7 @@ function applyLang() {
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n; (n = w.nextNode());) {
     const tag = n.parentNode.nodeName;
-    if (tag === 'SCRIPT' || tag === 'STYLE') continue;
+    if (tag === 'SCRIPT' || tag === 'STYLE' || n.parentNode.id === 'btnLang') continue;
     if (n.__t === undefined) n.__t = n.nodeValue;
     n.nodeValue = tr(n.__t);
   }
@@ -444,6 +454,8 @@ function renderResult() {
 $('btnLang').onclick = () => { lang = lang === 'sc' ? 'tc' : 'sc'; try { localStorage.setItem('cw-lang', lang); } catch (e) {} renderRoster(); render(); };
 $('btnNone').onclick = () => { ACHS.forEach(a => a.checked = false); renderAchs(); render(); };
 ['sB', 'sCost'].forEach(id => $(id).addEventListener('input', render));
+// 網址 #1,7,8 可預先勾選成就（方便分享）
+location.hash.slice(1).split(',').forEach(n => { const a = ACHS.find(x => x.no === +n); if (a) a.checked = true; });
 renderAchs(); renderRoster(); render();
 </script>
 </body>
