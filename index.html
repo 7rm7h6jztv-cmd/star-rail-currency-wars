@@ -90,7 +90,7 @@
       <div class="row"><span>前台格</span><span>4（固定）</span></div>
       <div class="row"><label for="sB">後台格（最多 9）</label><input type="number" id="sB" min="0" max="9" value="9"></div>
       <div class="row"><label for="sCost">費用偏好</label><select id="sCost"><option value="high">優先高費角色</option><option value="low">優先低費角色</option></select></div>
-      <p class="hint">每名角色最多帶 3 個星徽，星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
+      <p class="hint">每名角色最多帶 3 個星徽（賽飛兒自帶裝備「翻飛之幣」佔一格，只能帶 2 個），星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
     </section>
   </div>
   <div>
@@ -234,6 +234,7 @@ const ACHS = CSV_ACH.split('\n').map(l => {
 });
 const pick = {}; // id -> 'must' | 'ban'
 pick[CHARS.find(c => c.name === '帕姆王').id] = 'ban'; // 預設排除，可在「指定角色」點回來
+const EMB_CAP = { '賽飛兒': 2 }; // 自帶裝備「翻飛之幣」佔一格，其餘角色用預設上限
 
 // ---------- 求解 ----------
 function solve() {
@@ -314,7 +315,7 @@ function assignEmblems(team, bonds, deficit, K) {
     cap[0][i + 1] = deficit[b];
     team.forEach((c, j) => { if (!c.bonds.includes(b)) cap[i + 1][nb + 1 + j] = 1; });
   });
-  team.forEach((c, j) => cap[nb + 1 + j][T] = K);
+  team.forEach((c, j) => cap[nb + 1 + j][T] = EMB_CAP[c.name] ?? K);
   for (;;) {
     const prev = new Array(n).fill(-1); prev[0] = 0;
     const q = [0];
@@ -421,7 +422,7 @@ function renderResult() {
     const img = el('img'); img.src = 'img/c' + String(c.id).padStart(2, '0') + '.png'; img.alt = ''; img.loading = 'lazy';
     img.onerror = () => img.remove();
     const body = el('div', 'body');
-    body.append(top, el('div', 'meta', c.pos));
+    body.append(top, el('div', 'meta', c.pos + (EMB_CAP[c.name] ? `・星徽上限 ${EMB_CAP[c.name]}` : '')));
     const chips = el('div', 'chips');
     c.bonds.forEach(b => chips.append(el('span', 'chip' + (selBonds.has(b) ? ' hit' : ''), b)));
     (r.emb.byChar[c.id] || []).forEach(b => chips.append(el('span', 'chip emb', '＋' + b)));
