@@ -92,7 +92,7 @@
       <div class="row"><label for="sB">後台格（最多 9）</label><input type="number" id="sB" min="0" max="9" value="9"></div>
       <div class="row"><label for="sCost">費用偏好</label><select id="sCost"><option value="high">優先高費角色</option><option value="low">優先低費角色</option></select></div>
       <p class="hint">每名角色最多帶 3 個星徽（賽飛兒自帶裝備「翻飛之幣」佔一格，只能帶 2 個），星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
-      <p class="hint">丹恆•飲月的「百相共吟」可在召喚、連擊、治療、反擊中自選 1 個羈絆加入（算成員，不佔星徽格），會自動挑最有利的一個。</p>
+      <p class="hint">丹恆•飲月升到 3 星（5 費 3 星）後，「百相共吟」會同時加入召喚、連擊、治療、反擊四個羈絆（算成員，不佔星徽格）。陣容中用到他時皆以 3 星計算，角色旁會標「需 3 星 5 費」。</p>
     </section>
   </div>
   <div>
@@ -221,17 +221,19 @@ const CSV_ACH = `1,仙舟艦隊,9
 13,連擊,8
 14,歡愉,8`;
 
-// 天賦「百相共吟」：可從這幾個羈絆中自選 1 個加入（算成員，不佔星徽格）
+// 天賦「百相共吟」：升到 3 星（5 費 3 星）後，這四個羈絆全部加入（算成員，不佔星徽格）
+// 本工具一律以 3 星計算，所以畫面上會在角色旁標「需 3 星 5 費」
 const FLEX = { '丹恆•飲月': ['召喚', '連擊', '治療', '反擊'] };
+const STAR3_NOTE = '需 3 星 5 費';
 const CHARS = CSV_CHARS.split('\n').map((l, i) => {
   const p = l.split(',');
   const base = p.slice(3).filter(Boolean);
-  return { id: i, costText: p[0], cost: parseInt(p[0], 10), name: p[1], pos: p[2], base, bonds: base, flex: FLEX[p[1]] || null, flexPick: null };
+  return { id: i, costText: p[0], cost: parseInt(p[0], 10), name: p[1], pos: p[2], base, bonds: base.concat(FLEX[p[1]] || []), flex: FLEX[p[1]] || null };
 });
 const BONDS = {};
 CSV_BONDS.split('\n').forEach(l => {
   const [name, type, th] = l.split(',');
-  BONDS[name] = { name, type, th: th ? th.split('/').map(Number) : [], members: CHARS.filter(c => c.base.includes(name) || (c.flex && c.flex.includes(name))).map(c => c.id) };
+  BONDS[name] = { name, type, th: th ? th.split('/').map(Number) : [], members: CHARS.filter(c => c.bonds.includes(name)).map(c => c.id) };
 });
 const ACHS = CSV_ACH.split('\n').map(l => {
   const [no, bond, need] = l.split(',');
@@ -242,31 +244,7 @@ pick[CHARS.find(c => c.name === '帕姆王').id] = 'ban'; // 預設排除，可�
 const EMB_CAP = { '賽飛兒': 2 }; // 自帶裝備「翻飛之幣」佔一格，其餘角色用預設上限
 
 // ---------- 求解 ----------
-// 自選羈絆的角色：把每個「對勾選成就有用」的選項各解一次，留下最好的
 function solve() {
-  const wanted = new Set(ACHS.filter(a => a.checked).map(a => a.bond));
-  const dir = document.getElementById('sCost').value === 'high' ? -1 : 1;
-  const setFlex = (c, o) => { c.flexPick = o; c.bonds = o ? c.base.concat(o) : c.base; };
-  CHARS.forEach(c => { if (c.flex) setFlex(c, null); });
-  const fc = CHARS.find(c => c.flex && pick[c.id] !== 'ban');
-  let opts = fc ? fc.flex.filter(b => wanted.has(b)) : [];
-  if (!opts.length) opts = [null];
-  let best = null;
-  for (const o of opts) {
-    if (fc) setFlex(fc, o);
-    const r = solveOnce();
-    if (!r) return null;
-    r.flexOpt = o;
-    r.okN = r.rows.filter(x => x.ok).length;
-    r.cost = r.team.reduce((s, c) => s + c.cost, 0);
-    if (!best || r.okN > best.okN || (r.okN === best.okN && (r.emb.total < best.emb.total ||
-        (r.emb.total === best.emb.total && dir * r.cost < dir * best.cost)))) best = r;
-  }
-  if (fc) setFlex(fc, best.flexOpt);
-  return best;
-}
-
-function solveOnce() {
   const sel = ACHS.filter(a => a.checked);
   const F = 4, K = 3, B = clampInt('sB', 0, 9, 9), N = F + B;
   if (!sel.length) return null;
@@ -410,8 +388,8 @@ function renderAchs() {
 function renderRoster() {
   const box = $('roster'); box.textContent = '';
   CHARS.slice().sort((a, b) => a.cost - b.cost).forEach(c => {
-    const chip = el('span', 'rc ' + (pick[c.id] || ''), `${c.cost}｜${c.name}`);
-    chip.title = tr(c.base.join('、') + (c.flex ? '＋自選 ' + c.flex.join('/') : '') + '（' + c.pos + '）');
+    const chip = el('span', 'rc ' + (pick[c.id] || ''), `${c.cost}｜${c.name}` + (c.flex ? `（${STAR3_NOTE}）` : ''));
+    chip.title = tr(c.base.join('、') + (c.flex ? '＋' + STAR3_NOTE + '：' + c.flex.join('/') : '') + '（' + c.pos + '）');
     chip.onclick = () => {
       pick[c.id] = pick[c.id] === 'must' ? 'ban' : pick[c.id] === 'ban' ? undefined : 'must';
       renderRoster(); render();
@@ -451,10 +429,11 @@ function renderResult() {
     const img = el('img'); img.src = 'img/c' + String(c.id).padStart(2, '0') + '.png'; img.alt = ''; img.loading = 'lazy';
     img.onerror = () => img.remove();
     const body = el('div', 'body');
-    body.append(top, el('div', 'meta', c.pos + (EMB_CAP[c.name] ? `・星徽上限 ${EMB_CAP[c.name]}` : '')));
+    const meta = el('div', 'meta', c.pos + (EMB_CAP[c.name] ? `・星徽上限 ${EMB_CAP[c.name]}` : ''));
+    if (c.flex) meta.append('・', el('b', 'warn', STAR3_NOTE));
+    body.append(top, meta);
     const chips = el('div', 'chips');
-    c.bonds.forEach(b => chips.append(el('span', 'chip' + (selBonds.has(b) ? ' hit' : '') + (b === c.flexPick ? ' flex' : ''), b === c.flexPick ? '自選・' + b : b)));
-    if (c.flex && !c.flexPick) chips.append(el('span', 'chip flex', '可自選：' + c.flex.join('/')));
+    c.bonds.forEach(b => chips.append(el('span', 'chip' + (selBonds.has(b) ? ' hit' : '') + (c.flex && c.flex.includes(b) ? ' flex' : ''), b)));
     (r.emb.byChar[c.id] || []).forEach(b => chips.append(el('span', 'chip emb', '＋' + b)));
     body.append(chips);
     card.append(img, body);
