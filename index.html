@@ -99,7 +99,8 @@
       <div class="row"><label for="sB">後台格（最多 9）</label><input type="number" id="sB" min="0" max="9" value="9"></div>
       <div class="row"><label for="sCost">費用偏好</label><select id="sCost"><option value="high">優先高費角色</option><option value="low">優先低費角色</option></select></div>
       <p class="hint">星徽共 21 種：雲上五驍、少女樂隊沒有星徽，只能靠成員湊滿。每名角色最多帶 3 個星徽（賽飛兒自帶裝備「翻飛之幣」佔一格，只能帶 2 個），星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
-      <p class="hint">丹恆•飲月升到 3 星（5 費 3 星）後，「百相共吟」會同時加入召喚、連擊、治療、反擊四個羈絆（算成員，不佔星徽格）。陣容中用到他時皆以 3 星計算，角色旁會標「需 3 星 5 費」。</p>
+      <p class="hint">千星商會是特殊規則：只有升到 3 星的成員才算層數，所以【4三星】要 4 名 3 星成員、【6三星】要 6 名全部 3 星，不能用星徽補。陣容中的千星商會成員會標「需 3 星」。</p>
+      <p class="hint">丹恆•飲月升到 3 星後，「百相共吟」會同時加入召喚、連擊、治療、反擊四個羈絆（算成員，不佔星徽格）。陣容中用到他時皆以 3 星計算，角色旁會標「需 3 星」。</p>
       <p class="hint">星神★阿哈升到 3 星後，場上所有單位都會附加歡愉、幻月遊戲兩個羈絆（算成員，不佔星徽格）。目標含這兩個羈絆時會比較「帶 3 星阿哈」與「不帶」兩種陣容，取星徽較少的；不想靠 3 星阿哈，就在「指定角色」把他排除。</p>
     </section>
   </div>
@@ -229,10 +230,10 @@ const CSV_ACH = `1,仙舟艦隊,9
 13,連擊,8
 14,歡愉,8`;
 
-// 天賦「百相共吟」：升到 3 星（5 費 3 星）後，這四個羈絆全部加入（算成員，不佔星徽格）
-// 本工具一律以 3 星計算，所以畫面上會在角色旁標「需 3 星 5 費」
+// 天賦「百相共吟」：升到 3 星後，這四個羈絆全部加入（算成員，不佔星徽格）
+// 本工具一律以 3 星計算，所以畫面上會在角色旁標「需 3 星」
 const FLEX = { '丹恆•飲月': ['召喚', '連擊', '治療', '反擊'] };
-const STAR3_NOTE = '需 3 星 5 費';
+const STAR3_NOTE = '需 3 星';
 const CHARS = CSV_CHARS.split('\n').map((l, i) => {
   const p = l.split(',');
   const base = p.slice(3).filter(Boolean);
@@ -261,6 +262,8 @@ const CHAIN = [
   ['擊破', 6], ['連擊', 6], ['追擊', 7], ['持續傷害', 7], ['群攻', 6], ['歡愉', 6],
   ['反擊', 4], ['召喚', 4], ['能量', 4], ['治療', 6], ['守護', 3],
 ].map(([bond, need, star3]) => ({ bond, need, star3: !!star3, checked: false }));
+// 特殊規則：千星商會只有升到 3 星的成員才算層數（所以任務寫成【N三星】），本工具不以星徽補
+const STAR3_BONDS = ['千星商會'];
 // 星徽只有 21 種（來自裝備圖鑑截圖），這兩個羈絆沒有星徽
 const NO_EMBLEM = ['雲上五驍', '少女樂隊'];
 
@@ -269,7 +272,8 @@ function targets() {
   const m = {};
   ACHS.concat(CHAIN).filter(a => a.checked).forEach(a => {
     const t = m[a.bond] || (m[a.bond] = { bond: a.bond, need: 0, star3: false });
-    if (a.need > t.need) { t.need = a.need; t.star3 = a.star3; }
+    t.need = Math.max(t.need, a.need);
+    t.star3 = STAR3_BONDS.includes(a.bond);
   });
   // 三星任務與沒有星徽的羈絆都不能用星徽補
   Object.values(m).forEach(t => t.noEmb = t.star3 || NO_EMBLEM.includes(t.bond));
@@ -502,6 +506,7 @@ function renderResult() {
     const meta = el('div', 'meta', c.pos + (EMB_CAP[c.name] ? `・星徽上限 ${EMB_CAP[c.name]}` : ''));
     if (c.flex) meta.append('・', el('b', 'warn', STAR3_NOTE));
     if (r.aura && c === AHA) meta.append('・', el('b', 'warn', AURA.note));
+    STAR3_BONDS.forEach(b => { if (selBonds.has(b) && c.bonds.includes(b)) meta.append('・', el('b', 'warn', '需 3 星')); });
     body.append(top, meta);
     const chips = el('div', 'chips');
     eb(c).forEach(b => chips.append(el('span', 'chip' + (selBonds.has(b) ? ' hit' : '') + ((c.flex && c.flex.includes(b)) || !c.bonds.includes(b) ? ' flex' : ''), b)));
@@ -519,7 +524,7 @@ function renderResult() {
     const tr = el('tr');
     tr.append(el('td', '', x.a.bond), el('td', 'num', x.members), el('td', 'num warn', x.emblems || ''),
       el('td', 'num', `${x.got} / ${x.a.need}`),
-      el('td', x.ok ? 'ok' : 'bad', x.ok ? (x.a.star3 ? `達成（${x.a.need} 名成員都要升到三星）` : '達成') : `差 ${x.a.need - x.got}` + (x.a.star3 ? '（三星不能用星徽）' : x.a.noEmb ? '（無星徽）' : '')));
+      el('td', x.ok ? 'ok' : 'bad', x.ok ? (x.a.star3 ? `達成（成員要升到 3 星才算，需 ${x.a.need} 名）` : '達成') : `差 ${x.a.need - x.got}` + (x.a.star3 ? '（三星不能用星徽）' : x.a.noEmb ? '（無星徽）' : '')));
     table.append(tr);
   });
   Object.values(BONDS).filter(b => !selBonds.has(b.name) && b.th.length).forEach(b => {
@@ -527,7 +532,7 @@ function renderResult() {
     const lv = b.th.filter(t => t <= n).pop();
     if (!lv) return;
     const tr = el('tr');
-    tr.append(el('td', 'dim', b.name), el('td', 'num dim', n), el('td'), el('td', 'num dim', `${n}（${b.th.join('/')}）`), el('td', 'dim', `順帶啟動 ${lv}`));
+    tr.append(el('td', 'dim', b.name), el('td', 'num dim', n), el('td'), el('td', 'num dim', `${n}（${b.th.join('/')}）`), el('td', 'dim', STAR3_BONDS.includes(b.name) ? `3 星成員才算（全 3 星可啟動 ${lv}）` : `順帶啟動 ${lv}`));
     table.append(tr);
   });
 }
