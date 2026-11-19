@@ -75,7 +75,7 @@
 <header>
   <button id="btnLang" style="float:right"></button>
   <h1>貨幣戰爭・入畫奇航 — 成就陣容產生器</h1>
-  <p>勾選想一次達成的「大師之路」成就，自動組出陣容，並算出還缺幾層需要用星徽補。</p>
+  <p>勾選想一次達成的「大師之路」成就或「羈絆鏈路」任務，自動組出陣容，並算出還缺幾層需要用星徽補。</p>
 </header>
 <main>
   <div>
@@ -87,18 +87,26 @@
       </div>
     </section>
     <section>
+      <h2>羈絆鏈路 <small>每個羈絆只列最難的一檔，可與成就混選</small></h2>
+      <div id="chainList"></div>
+      <div class="row" style="margin-top:6px">
+        <button id="btnChainNone">全部取消</button>
+      </div>
+    </section>
+    <section>
       <h2>設定</h2>
       <div class="row"><span>前台格</span><span>4（固定）</span></div>
       <div class="row"><label for="sB">後台格（最多 9）</label><input type="number" id="sB" min="0" max="9" value="9"></div>
       <div class="row"><label for="sCost">費用偏好</label><select id="sCost"><option value="high">優先高費角色</option><option value="low">優先低費角色</option></select></div>
-      <p class="hint">每名角色最多帶 3 個星徽（賽飛兒自帶裝備「翻飛之幣」佔一格，只能帶 2 個），星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
+      <p class="hint">星徽共 21 種：雲上五驍、少女樂隊沒有星徽，只能靠成員湊滿。每名角色最多帶 3 個星徽（賽飛兒自帶裝備「翻飛之幣」佔一格，只能帶 2 個），星徽數量不限。星徽讓非成員也算該羈絆一層；同一角色不能重複帶同一種，也不能帶自己已有的羈絆。</p>
       <p class="hint">丹恆•飲月升到 3 星（5 費 3 星）後，「百相共吟」會同時加入召喚、連擊、治療、反擊四個羈絆（算成員，不佔星徽格）。陣容中用到他時皆以 3 星計算，角色旁會標「需 3 星 5 費」。</p>
+      <p class="hint">星神★阿哈升到 3 星後，場上所有單位都會附加歡愉、幻月遊戲兩個羈絆（算成員，不佔星徽格）。目標含這兩個羈絆時會比較「帶 3 星阿哈」與「不帶」兩種陣容，取星徽較少的；不想靠 3 星阿哈，就在「指定角色」把他排除。</p>
     </section>
   </div>
   <div>
     <section>
       <h2>陣容</h2>
-      <div id="banner" class="banner idle">請先勾選成就。</div>
+      <div id="banner" class="banner idle">請先勾選成就或羈絆鏈路任務。</div>
       <div id="team"></div>
     </section>
     <section>
@@ -113,7 +121,7 @@
 </main>
 
 <script>
-// ---------- 資料（來自資料夾內的三個 CSV） ----------
+// ---------- 資料（來自資料夾內的 CSV 與遊戲截圖） ----------
 const CSV_CHARS = `4/5/7,星神★阿哈,前台,歡愉,幻樂之主,
 5,雪衣,前台,仙舟艦隊,擊破,
 5,帕姆王,後台,開拓銀軌,,
@@ -230,6 +238,13 @@ const CHARS = CSV_CHARS.split('\n').map((l, i) => {
   const base = p.slice(3).filter(Boolean);
   return { id: i, costText: p[0], cost: parseInt(p[0], 10), name: p[1], pos: p[2], base, bonds: base.concat(FLEX[p[1]] || []), flex: FLEX[p[1]] || null };
 });
+// 星神★阿哈升到 3 星後：場上所有單位都附加這兩個羈絆（算成員，不佔星徽格）
+// 陣容用到阿哈時一律以 3 星計算；不想靠 3 星阿哈就在「指定角色」把他排除
+const AURA = { name: '星神★阿哈', bonds: ['歡愉', '幻月遊戲'], note: '需 3 星' };
+const AHA = CHARS.find(c => c.name === AURA.name);
+CHARS.forEach(c => c.aura = c.bonds.concat(AURA.bonds.filter(b => !c.bonds.includes(b))));
+let auraOn = false; // 目前陣容是否有 3 星阿哈
+const eb = c => auraOn ? c.aura : c.bonds; // 角色實際擁有的羈絆
 const BONDS = {};
 CSV_BONDS.split('\n').forEach(l => {
   const [name, type, th] = l.split(',');
@@ -239,25 +254,66 @@ const ACHS = CSV_ACH.split('\n').map(l => {
   const [no, bond, need] = l.split(',');
   return { no: +no, bond, need: parseInt(need, 10), star3: need.includes('三星'), checked: false };
 });
+// 羈絆鏈路（來自遊戲內截圖）：每個羈絆只取最難的一檔 [羈絆, 層數, 是否為三星任務]
+const CHAIN = [
+  ['千星商會', 4, 1], ['雲上五驍', 5], ['夢境交織', 4], ['星間旅人', 6], ['小小巨人', 5], ['少女樂隊', 4],
+  ['幻月遊戲', 7], ['奇獸花園', 7], ['仙舟艦隊', 6], ['開拓銀軌', 6], ['星核獵手', 5], ['黃金大飯店', 4],
+  ['擊破', 6], ['連擊', 6], ['追擊', 7], ['持續傷害', 7], ['群攻', 6], ['歡愉', 6],
+  ['反擊', 4], ['召喚', 4], ['能量', 4], ['治療', 6], ['守護', 3],
+].map(([bond, need, star3]) => ({ bond, need, star3: !!star3, checked: false }));
+// 星徽只有 21 種（來自裝備圖鑑截圖），這兩個羈絆沒有星徽
+const NO_EMBLEM = ['雲上五驍', '少女樂隊'];
+
+// 把勾選的成就與羈絆鏈路任務合併成「每個羈絆要幾層」，同一羈絆取較高的層數
+function targets() {
+  const m = {};
+  ACHS.concat(CHAIN).filter(a => a.checked).forEach(a => {
+    const t = m[a.bond] || (m[a.bond] = { bond: a.bond, need: 0, star3: false });
+    if (a.need > t.need) { t.need = a.need; t.star3 = a.star3; }
+  });
+  // 三星任務與沒有星徽的羈絆都不能用星徽補
+  Object.values(m).forEach(t => t.noEmb = t.star3 || NO_EMBLEM.includes(t.bond));
+  return Object.values(m);
+}
+
 const pick = {}; // id -> 'must' | 'ban'
 pick[CHARS.find(c => c.name === '帕姆王').id] = 'ban'; // 預設排除，可在「指定角色」點回來
 const EMB_CAP = { '賽飛兒': 2 }; // 自帶裝備「翻飛之幣」佔一格，其餘角色用預設上限
 
 // ---------- 求解 ----------
 function solve() {
-  const sel = ACHS.filter(a => a.checked);
-  const F = 4, K = 3, B = clampInt('sB', 0, 9, 9), N = F + B;
+  const sel = targets();
   if (!sel.length) return null;
+  // 3 星阿哈會改變所有人的羈絆，所以「帶阿哈」與「不帶阿哈」各解一次，取較好的
+  const useful = sel.some(t => AURA.bonds.includes(t.bond));
+  const modes = pick[AHA.id] === 'must' ? [true] : pick[AHA.id] === 'ban' || !useful ? [false] : [false, true];
+  let best = null;
+  modes.forEach(m => {
+    auraOn = m;
+    const r = solveOnce(sel, m);
+    r.aura = m;
+    r.okCount = r.rows.filter(x => x.ok).length;
+    if (!best || r.okCount > best.okCount || (r.okCount === best.okCount && r.emb.total < best.emb.total)) best = r;
+  });
+  auraOn = best.aura;
+  return best;
+}
+
+function solveOnce(sel, withAha) {
+  const st = c => c === AHA ? (withAha ? 'must' : 'ban') : pick[c.id];
+  const F = 4, K = 3, B = clampInt('sB', 0, 9, 9), N = F + B;
   const dir = document.getElementById('sCost').value === 'high' ? -1 : 1; // 同樣能達成時，偏好低費或高費
 
   const need = {};
   sel.forEach(a => need[a.bond] = a.need);
   const selBonds = Object.keys(need);
 
-  const avail = CHARS.filter(c => pick[c.id] !== 'ban');
-  const must = avail.filter(c => pick[c.id] === 'must');
-  const weight = c => c.bonds.filter(b => b in need).length;
-  const cand = avail.filter(c => pick[c.id] !== 'must' && weight(c) > 0)
+  const avail = CHARS.filter(c => st(c) !== 'ban');
+  const must = avail.filter(c => st(c) === 'must');
+  // 不能用星徽補的羈絆，成員優先（權重較高）
+  const wt = {}; sel.forEach(a => wt[a.bond] = a.noEmb ? 20 : 1);
+  const weight = c => eb(c).reduce((s, b) => s + (wt[b] || 0), 0);
+  const cand = avail.filter(c => st(c) !== 'must' && weight(c) > 0)
     .sort((a, b) => weight(b) - weight(a) || dir * (a.cost - b.cost));
   const w = cand.map(weight);
   const pre = [0]; w.forEach((x, i) => pre.push(pre[i] + x));
@@ -266,7 +322,7 @@ function solve() {
   let fo = 0, bo = 0, cov = 0, cost = 0;
   const chosen = [];
   const add = (c, s) => {
-    c.bonds.forEach(b => { if (b in need) { if (s > 0) { if (cnt[b] < need[b]) cov++; cnt[b]++; } else { cnt[b]--; if (cnt[b] < need[b]) cov--; } } });
+    eb(c).forEach(b => { if (b in need) { if (s > 0) { if (cnt[b] < need[b]) cov += wt[b]; cnt[b]++; } else { cnt[b]--; if (cnt[b] < need[b]) cov -= wt[b]; } } });
     if (c.pos === '前台') fo += s; if (c.pos === '後台') bo += s;
     cost += s * c.cost;
     if (s > 0) chosen.push(c); else chosen.pop();
@@ -301,10 +357,10 @@ function solve() {
   // 缺口與星徽分配（最大流）
   const members = {}, deficit = {};
   selBonds.forEach(b => {
-    members[b] = team.filter(c => c.bonds.includes(b)).length;
+    members[b] = team.filter(c => eb(c).includes(b)).length;
     deficit[b] = Math.max(0, need[b] - members[b]);
   });
-  const embBonds = selBonds.filter(b => deficit[b] > 0 && !sel.find(a => a.bond === b).star3);
+  const embBonds = selBonds.filter(b => deficit[b] > 0 && !sel.find(a => a.bond === b).noEmb);
   const emb = assignEmblems(team, embBonds, deficit, K);
 
   const rows = sel.map(a => {
@@ -320,7 +376,7 @@ function assignEmblems(team, bonds, deficit, K) {
   const cap = Array.from({ length: n }, () => new Array(n).fill(0));
   bonds.forEach((b, i) => {
     cap[0][i + 1] = deficit[b];
-    team.forEach((c, j) => { if (!c.bonds.includes(b)) cap[i + 1][nb + 1 + j] = 1; });
+    team.forEach((c, j) => { if (!eb(c).includes(b)) cap[i + 1][nb + 1 + j] = 1; });
   });
   team.forEach((c, j) => cap[nb + 1 + j][T] = EMB_CAP[c.name] ?? K);
   for (;;) {
@@ -335,7 +391,7 @@ function assignEmblems(team, bonds, deficit, K) {
   }
   const byChar = {}, count = {};
   bonds.forEach((b, i) => team.forEach((c, j) => {
-    if (!c.bonds.includes(b) && cap[i + 1][nb + 1 + j] === 0) {
+    if (!eb(c).includes(b) && cap[i + 1][nb + 1 + j] === 0) {
       (byChar[c.id] = byChar[c.id] || []).push(b);
       count[b] = (count[b] || 0) + 1;
     }
@@ -350,7 +406,7 @@ function clampInt(id, lo, hi, def) {
 
 // ---------- 語言：資料與介面以繁體撰寫，簡體時逐字轉換 ----------
 const T2S = {};
-{ const p = '並并亂乱來来俠侠個个側侧傷伤兒儿內内剎刹動动員员啟启喚唤園园場场夢梦寶宝專专層层屬属師师帳账帶带幣币幾几後后恆恒態态戰战戲戏擊击敵敌數数會会樂乐機机歐欧歡欢歸归滿满漣涟為为無无營营爭争爾尔狀状獵猎獸兽環环產产畫画當当療疗盜盗種种節节級级組组絆绊結结統统緋绯緹缇總总織织續续羅罗羈羁與与艦舰萊莱萬万螢萤補补裝装複复計计設设話话該该請请護护讓让貨货費费資资賽赛軌轨載载這这連连進进遊游過过達达選选還还陣阵隊队雙双雲云靈灵順顺額额風风飛飞飯饭飲饮騰腾驍骁體体鳥鸟鴉鸦鵝鹅麗丽黃黄點点龍龙開开間间銀银鏡镜長长佔占夾夹優优時时';
+{ const p = '並并亂乱來来俠侠個个側侧傷伤兒儿內内剎刹動动員员啟启喚唤園园場场夢梦寶宝專专層层屬属師师帳账帶带幣币幾几後后恆恒態态戰战戲戏擊击敵敌數数會会樂乐機机歐欧歡欢歸归滿满漣涟為为無无營营爭争爾尔狀状獵猎獸兽環环產产畫画當当療疗盜盗種种節节級级組组絆绊結结統统緋绯緹缇總总織织續续羅罗羈羁與与艦舰萊莱萬万螢萤補补裝装複复計计設设話话該该請请護护讓让貨货費费資资賽赛軌轨載载這这連连進进遊游過过達达選选還还陣阵隊队雙双雲云靈灵順顺額额風风飛飞飯饭飲饮騰腾驍骁體体鳥鸟鴉鸦鵝鹅麗丽黃黄點点龍龙開开間间銀银鏡镜長长佔占夾夹優优時时鏈链務务檔档湊凑難难';
   for (let i = 0; i < p.length; i += 2) T2S[p[i]] = p[i + 1]; }
 let lang = 'sc';
 try { lang = localStorage.getItem('cw-lang') || 'sc'; } catch (e) {}
@@ -385,11 +441,24 @@ function renderAchs() {
   });
 }
 
+function renderChain() {
+  const box = $('chainList'); box.textContent = '';
+  CHAIN.forEach(a => {
+    const row = el('label', 'ach');
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = a.checked;
+    cb.onchange = () => { a.checked = cb.checked; render(); };
+    row.append(cb, el('span', 'nm', a.star3 ? `【${a.need}三星】${a.bond}` : `${a.need} ${a.bond}`));
+    if (NO_EMBLEM.includes(a.bond)) row.append(el('span', 'tag', '無星徽'));
+    row.append(el('span', 'tag', `成員 ${BONDS[a.bond].members.length}`));
+    box.append(row);
+  });
+}
+
 function renderRoster() {
   const box = $('roster'); box.textContent = '';
   CHARS.slice().sort((a, b) => a.cost - b.cost).forEach(c => {
-    const chip = el('span', 'rc ' + (pick[c.id] || ''), `${c.cost}｜${c.name}` + (c.flex ? `（${STAR3_NOTE}）` : ''));
-    chip.title = tr(c.base.join('、') + (c.flex ? '＋' + STAR3_NOTE + '：' + c.flex.join('/') : '') + '（' + c.pos + '）');
+    const chip = el('span', 'rc ' + (pick[c.id] || ''), `${c.cost}｜${c.name}` + (c.flex ? `（${STAR3_NOTE}）` : c === AHA ? `（${AURA.note}）` : ''));
+    chip.title = tr(c.base.join('、') + (c.flex ? '＋' + STAR3_NOTE + '：' + c.flex.join('/') : '') + (c === AHA ? '＋' + AURA.note + '：全員附加' + AURA.bonds.join('/') : '') + '（' + c.pos + '）');
     chip.onclick = () => {
       pick[c.id] = pick[c.id] === 'must' ? 'ban' : pick[c.id] === 'ban' ? undefined : 'must';
       renderRoster(); render();
@@ -403,15 +472,16 @@ function renderResult() {
   const r = solve();
   const banner = $('banner'), teamBox = $('team'), table = $('bondTable');
   teamBox.textContent = ''; table.textContent = '';
-  if (!r) { banner.className = 'banner idle'; banner.textContent = '請先勾選成就。'; return; }
+  if (!r) { banner.className = 'banner idle'; banner.textContent = '請先勾選成就或羈絆鏈路任務。'; return; }
 
   const allOk = r.rows.every(x => x.ok);
   const totalCost = r.team.reduce((s, c) => s + c.cost, 0);
   banner.className = 'banner ' + (allOk ? 'ok' : 'bad');
   banner.textContent = allOk
-    ? `可以同時達成 ${r.rows.length} 個成就：${r.team.length} 人，需要 ${r.emb.total} 個星徽，總費用 ${totalCost}。`
+    ? `可以同時達成 ${r.rows.length} 個羈絆目標：${r.team.length} 人，需要 ${r.emb.total} 個星徽，總費用 ${totalCost}。`
     : `這個人數與星徽上限下無法全部達成（未達成：${r.rows.filter(x => !x.ok).map(x => x.a.bond).join('、')}）。下面是最接近的陣容。`;
   if (r.truncated) banner.textContent += '（組合過多，結果為近似解）';
+  if (r.aura) banner.textContent += ` ${AURA.name}${AURA.note}：全員附加${AURA.bonds.join('、')}。`;
 
   const selBonds = new Set(r.rows.map(x => x.a.bond));
   // 分配站位：只能前台的先佔前台，前後台皆可的由高費開始補滿前台，其餘放後台
@@ -431,9 +501,10 @@ function renderResult() {
     const body = el('div', 'body');
     const meta = el('div', 'meta', c.pos + (EMB_CAP[c.name] ? `・星徽上限 ${EMB_CAP[c.name]}` : ''));
     if (c.flex) meta.append('・', el('b', 'warn', STAR3_NOTE));
+    if (r.aura && c === AHA) meta.append('・', el('b', 'warn', AURA.note));
     body.append(top, meta);
     const chips = el('div', 'chips');
-    c.bonds.forEach(b => chips.append(el('span', 'chip' + (selBonds.has(b) ? ' hit' : '') + (c.flex && c.flex.includes(b) ? ' flex' : ''), b)));
+    eb(c).forEach(b => chips.append(el('span', 'chip' + (selBonds.has(b) ? ' hit' : '') + ((c.flex && c.flex.includes(b)) || !c.bonds.includes(b) ? ' flex' : ''), b)));
     (r.emb.byChar[c.id] || []).forEach(b => chips.append(el('span', 'chip emb', '＋' + b)));
     body.append(chips);
     card.append(img, body);
@@ -448,11 +519,11 @@ function renderResult() {
     const tr = el('tr');
     tr.append(el('td', '', x.a.bond), el('td', 'num', x.members), el('td', 'num warn', x.emblems || ''),
       el('td', 'num', `${x.got} / ${x.a.need}`),
-      el('td', x.ok ? 'ok' : 'bad', x.ok ? (x.a.star3 ? '達成（6 名成員都要升到三星）' : '達成') : `差 ${x.a.need - x.got}`));
+      el('td', x.ok ? 'ok' : 'bad', x.ok ? (x.a.star3 ? `達成（${x.a.need} 名成員都要升到三星）` : '達成') : `差 ${x.a.need - x.got}` + (x.a.star3 ? '（三星不能用星徽）' : x.a.noEmb ? '（無星徽）' : '')));
     table.append(tr);
   });
   Object.values(BONDS).filter(b => !selBonds.has(b.name) && b.th.length).forEach(b => {
-    const n = r.team.filter(c => c.bonds.includes(b.name)).length;
+    const n = r.team.filter(c => eb(c).includes(b.name)).length;
     const lv = b.th.filter(t => t <= n).pop();
     if (!lv) return;
     const tr = el('tr');
@@ -462,11 +533,12 @@ function renderResult() {
 }
 
 $('btnLang').onclick = () => { lang = lang === 'sc' ? 'tc' : 'sc'; try { localStorage.setItem('cw-lang', lang); } catch (e) {} renderRoster(); render(); };
+$('btnChainNone').onclick = () => { CHAIN.forEach(a => a.checked = false); renderChain(); render(); };
 $('btnNone').onclick = () => { ACHS.forEach(a => a.checked = false); renderAchs(); render(); };
 ['sB', 'sCost'].forEach(id => $(id).addEventListener('input', render));
 // 網址 #1,7,8 可預先勾選成就（方便分享）
 location.hash.slice(1).split(',').forEach(n => { const a = ACHS.find(x => x.no === +n); if (a) a.checked = true; });
-renderAchs(); renderRoster(); render();
+renderAchs(); renderChain(); renderRoster(); render();
 </script>
 </body>
 </html>
